@@ -91,6 +91,9 @@
 1. Git репозиторий с тестовым приложением и Dockerfile.
 2. Регистри с собранным docker image. В качестве регистри может быть DockerHub или [Yandex Container Registry](https://cloud.yandex.ru/services/container-registry), созданный также с помощью terraform.
 
+<img width="1019" height="220" alt="image" src="https://github.com/user-attachments/assets/cbceb27c-ecfc-4d74-8eaf-f5051b219e6e" />
+
+
 ---
 ### Подготовка cистемы мониторинга и деплой приложения
 
