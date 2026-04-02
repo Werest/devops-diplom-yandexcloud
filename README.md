@@ -51,7 +51,74 @@
 
 1. Terraform сконфигурирован и создание инфраструктуры посредством Terraform возможно без дополнительных ручных действий, стейт основной конфигурации сохраняется в бакете или Terraform Cloud
 2. Полученная конфигурация инфраструктуры является предварительной, поэтому в ходе дальнейшего выполнения задания возможны изменения.
+---
+У меня были проблемы с ansible на windows, поэтому переехал на ubuntu server
 
+Структура проекта разделена на две папки:
+- bootstrap - Cоздание сервисного аккаунта и бакета
+- main - Основная инфраструктура (VPC, ВМ, K8s) / создаст inventory файл для поднятия Kubernetes кластера
+
+Для запуска по кнопке сделал bash скрипт, который сделает всё.
+setup.sh установит в cloud yandex всю инфру, затем через Kubespray установим Kubernetes кластер
+Перед этим может потребоваться chmod +x setup.sh
+```commandline
+#!/bin/bash
+set -e
+
+if [ -n "$1" ]; then
+    INVENTORY_PATH="$(realpath "$1")"
+else
+    INVENTORY_PATH="$(realpath "$(dirname "$0")/../diplom_ubuntu/main/inventory.ini")"
+fi
+
+echo "Using inventory: $INVENTORY_PATH"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+echo "=== Bootstrap phase ==="
+cd bootstap
+terraform init -reconfigure
+terraform apply -auto-approve
+
+export AWS_ACCESS_KEY_ID=$(terraform output -raw access_key)
+export AWS_SECRET_ACCESS_KEY=$(terraform output -raw secret_key)
+
+echo "=== Main phase ==="
+cd ../main
+terraform init -reconfigure
+terraform apply -auto-approve
+
+echo "=== Kubespray phase ==="
+# Установка Ansible, если отсутствует
+if ! command -v ansible >/dev/null 2>&1; then
+  echo "Ansible not found, installing via apt..."
+  sudo apt update && sudo apt install -y ansible
+fi
+
+cd
+if [ ! -d "kubespray" ]; then
+  git clone https://github.com/kubernetes-sigs/kubespray.git
+fi
+cd kubespray
+python3 -m venv venv || true
+source venv/bin/activate
+pip install -r requirements.txt
+ansible-playbook -i "$INVENTORY_PATH" cluster.yml -b -v
+
+echo "Done."
+```
+
+Ключи для backend s3 передаю через
+```commandline
+export AWS_ACCESS_KEY_ID=$(terraform output -raw access_key)
+export AWS_SECRET_ACCESS_KEY=$(terraform output -raw secret_key)
+```
+
+После запуска
+![img_14.png](imgs/img_14.png)
+
+![img_1.png](imgs/img_1.png)
 ---
 ### Создание Kubernetes кластера
 
@@ -72,7 +139,16 @@
 1. Работоспособный Kubernetes кластер.
 2. В файле `~/.kube/config` находятся данные для доступа к кластеру.
 3. Команда `kubectl get pods --all-namespaces` отрабатывает без ошибок.
+---
+Нужно создать config кластера Kubernetes.
+Подключаемся к master выполняем команды:
+![img.png](imgs/img.png)
 
+Папка для конфигурации создана, файл настроек скопирован и защищен правами.
+Теперь проверяем работоспособность кластера: поды и ноды.
+![img_2.png](imgs/img_2.png)
+
+Все поды и ноды готовы к работе. Развертывание кластера Kubernetes завершено успешно.
 ---
 ### Создание тестового приложения
 
@@ -107,7 +183,62 @@
 
 Способ выполнения:
 1. Воспользоваться пакетом [kube-prometheus](https://github.com/prometheus-operator/kube-prometheus), который уже включает в себя [Kubernetes оператор](https://operatorhub.io/) для [grafana](https://grafana.com/), [prometheus](https://prometheus.io/), [alertmanager](https://github.com/prometheus/alertmanager) и [node_exporter](https://github.com/prometheus/node_exporter). Альтернативный вариант - использовать набор helm чартов от [bitnami](https://github.com/bitnami/charts/tree/main/bitnami).
+---
+Чтобы управлять кластером удобнее, скопирую файл конфигурации на свой компьютер и обновлю в нем IP-адрес.
+Забираю config - scp ubuntu@<master_ip>:.kube/config ~/.kube/config
+![img_4.png](imgs/img_4.png)
+Бывает ещё так, что
+```
+kubectl get nodes
+E0330 20:10:09.528906    1732 memcache.go:265] "Unhandled Error" err="couldn't get current server API group 
+list: Get \"https://93.77.185.179:6443/api?timeout=32s\": tls: failed to verify certificate: x509: 
+certificate is valid for 10.233.0.1, 10.1.0.4, 127.0.0.1, ::1, not 93.77.185.179"
+Ошибка говорит о том, что сертификат API-сервера Kubernetes не включает публичный IP-адрес 93.77.185.179. 
+В сертификате указаны только внутренние адреса кластера и 127.0.0.1. 
+Поэтому при подключении с внешней машины проверка подлинности сервера не проходит.
+```
+Тогда решение
+```
+kubectl -n kube-system get cm kubeadm-config -o jsonpath='{.data.ClusterConfiguration}' > kubeadm-config.yaml
+sudo mv /etc/kubernetes/pki/apiserver.crt /etc/kubernetes/pki/apiserver.crt.bak
+sudo mv /etc/kubernetes/pki/apiserver.key /etc/kubernetes/pki/apiserver.key.bak
+sudo kubeadm init phase certs apiserver --config=kubeadm-config.yaml
+sudo cat /etc/kubernetes/admin.conf > ~/.kube/config
+# local
+chmod 600 ~/.kube/config
+```
+![img_5.png](imgs/img_5.png)
 
+### Установка kube-prometheus-stack
+```
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+
+helm install monitoring prometheus-community/kube-prometheus-stack \
+--namespace monitoring \
+--create-namespace \
+--set grafana.service.type=NodePort \
+--set grafana.service.nodePort=30080
+
+kubectl get secret -n monitoring monitoring-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+kubectl get svc -n monitoring monitoring-grafana
+```
+Получаем пароль к grafana
+```
+kubectl get secret -n monitoring monitoring-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+```
+
+![img_7.png](imgs/img_7.png)
+
+![img_8.png](imgs/img_8.png)
+
+## Деплой приложения kubectl apply -f
+![img_12.png](imgs/img_12.png)
+
+![img_13.png](imgs/img_13.png)
+
+[GitHub - приложения](https://github.com/Werest/test-app)
+---
 ### Деплой инфраструктуры в terraform pipeline
 
 1. Если на первом этапе вы не воспользовались [Terraform Cloud](https://app.terraform.io/), то задеплойте и настройте в кластере [atlantis](https://www.runatlantis.io/) для отслеживания изменений инфраструктуры. Альтернативный вариант 3 задания: вместо Terraform Cloud или atlantis настройте на автоматический запуск и применение конфигурации terraform из вашего git-репозитория в выбранной вами CI-CD системе при любом комите в main ветку. Предоставьте скриншоты работы пайплайна из CI/CD системы.
@@ -118,6 +249,29 @@
 3. Дашборды в grafana отображающие состояние Kubernetes кластера.
 4. Http доступ на 80 порту к тестовому приложению.
 5. Atlantis или terraform cloud или ci/cd-terraform
+---
+После создания сервисного аккаунта повторно может возникнуть ошибка
+Service account 'aje27102e538kndc7k9h' already exists
+Поэтому однажды создаем сервисный аккаунт
+Записываем в секреты access_key и secret_key
+
+И запускаем создание 1 master и 2 worker.
+Поднятие Kubernetes происходит через Kuberspray + inventory.ini + kube-prometheus-stack
+Настроить Kubespray на добавление публичного IP в сертификат - --extra-vars "apiserver_cert_extra_sans=['$MASTER_IP']"
+Использовать --forks – увеличить количество параллельных задач:
+```yaml
+      - name: Run Kubespray playbook
+        run: |
+          MASTER_IP=$(terraform output -raw master_ip)
+          cd kubespray
+          source venv/bin/activate
+          ansible-playbook -i ../inventory.ini cluster.yml -b --user ubuntu \
+          --forks=20 \
+          --extra-vars "apiserver_cert_extra_sans=['$MASTER_IP']"
+```
+
+
+
 ---
 ### Установка и настройка CI/CD
 
@@ -135,7 +289,24 @@
 1. Интерфейс ci/cd сервиса доступен по http.
 2. При любом коммите в репозиторие с тестовым приложением происходит сборка и отправка в регистр Docker образа.
 3. При создании тега (например, v1.0.0) происходит сборка и отправка с соответствующим label в регистри, а также деплой соответствующего Docker образа в кластер Kubernetes.
+---
+[GitHub - приложения](https://github.com/Werest/test-app)
 
+[Установка и настройка CI/CD для приложения через Github Actions](https://github.com/Werest/test-app/actions/workflows/docker-image.yml)
+
+Docker hub
+![img_15.png](imgs/img_15.png)
+Github Actions при коммите в main и при создании tag v1.0.0
+![img_16.png](imgs/img_16.png)
+
+![img_17.png](imgs/img_17.png)
+
+![img_18.png](imgs/img_18.png)
+
+### До тега:
+![img_19.png](imgs/img_19.png)
+### С тегом 1.0.1:
+![img_20.png](imgs/img_20.png)
 ---
 ## Что необходимо для сдачи задания?
 
