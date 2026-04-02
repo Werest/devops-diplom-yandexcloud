@@ -186,7 +186,9 @@ export AWS_SECRET_ACCESS_KEY=$(terraform output -raw secret_key)
 ---
 Чтобы управлять кластером удобнее, скопирую файл конфигурации на свой компьютер и обновлю в нем IP-адрес.
 Забираю config - scp ubuntu@<master_ip>:.kube/config ~/.kube/config
+
 ![img_4.png](imgs/img_4.png)
+
 Бывает ещё так, что
 ```
 kubectl get nodes
@@ -250,6 +252,7 @@ kubectl get secret -n monitoring monitoring-grafana -o jsonpath="{.data.admin-pa
 4. Http доступ на 80 порту к тестовому приложению.
 5. Atlantis или terraform cloud или ci/cd-terraform
 ---
+```
 После создания сервисного аккаунта повторно может возникнуть ошибка
 Service account 'aje27102e538kndc7k9h' already exists
 Поэтому однажды создаем сервисный аккаунт
@@ -259,6 +262,7 @@ Service account 'aje27102e538kndc7k9h' already exists
 Поднятие Kubernetes происходит через Kuberspray + inventory.ini + kube-prometheus-stack
 Настроить Kubespray на добавление публичного IP в сертификат - --extra-vars "apiserver_cert_extra_sans=['$MASTER_IP']"
 Использовать --forks – увеличить количество параллельных задач:
+```
 ```yaml
       - name: Run Kubespray playbook
         run: |
@@ -294,13 +298,11 @@ Service account 'aje27102e538kndc7k9h' already exists
 
 [Установка и настройка CI/CD для приложения через Github Actions](https://github.com/Werest/test-app/actions/workflows/docker-image.yml)
 
-Docker hub
+### Docker hub
 ![img_15.png](imgs/img_15.png)
-Github Actions при коммите в main и при создании tag v1.0.0
+### Github Actions при коммите в main и при создании tag v1.0.0
 ![img_16.png](imgs/img_16.png)
-
 ![img_17.png](imgs/img_17.png)
-
 ![img_18.png](imgs/img_18.png)
 
 ### До тега:
