@@ -168,6 +168,7 @@ export AWS_SECRET_ACCESS_KEY=$(terraform output -raw secret_key)
 2. Регистри с собранным docker image. В качестве регистри может быть DockerHub или [Yandex Container Registry](https://cloud.yandex.ru/services/container-registry), созданный также с помощью terraform.
 
 - [Git](https://github.com/Werest/test-app)
+
 <img width="1019" height="220" alt="image" src="https://github.com/user-attachments/assets/cbceb27c-ecfc-4d74-8eaf-f5051b219e6e" />
 
 
@@ -184,8 +185,10 @@ export AWS_SECRET_ACCESS_KEY=$(terraform output -raw secret_key)
 Способ выполнения:
 1. Воспользоваться пакетом [kube-prometheus](https://github.com/prometheus-operator/kube-prometheus), который уже включает в себя [Kubernetes оператор](https://operatorhub.io/) для [grafana](https://grafana.com/), [prometheus](https://prometheus.io/), [alertmanager](https://github.com/prometheus/alertmanager) и [node_exporter](https://github.com/prometheus/node_exporter). Альтернативный вариант - использовать набор helm чартов от [bitnami](https://github.com/bitnami/charts/tree/main/bitnami).
 ---
-Чтобы управлять кластером удобнее, скопирую файл конфигурации на свой компьютер и обновлю в нем IP-адрес.
+Чтобы управлять кластером удобнее, скопирую файл конфигурации на свой компьютер и обновлю в нем IP-адрес. 
+
 Забираю config - scp ubuntu@<master_ip>:.kube/config ~/.kube/config
+
 ![img_4.png](imgs/img_4.png)
 Бывает ещё так, что
 ```
@@ -257,20 +260,47 @@ Service account 'aje27102e538kndc7k9h' already exists
 
 И запускаем создание 1 master и 2 worker.
 Поднятие Kubernetes происходит через Kuberspray + inventory.ini + kube-prometheus-stack
-Настроить Kubespray на добавление публичного IP в сертификат - --extra-vars "apiserver_cert_extra_sans=['$MASTER_IP']"
-Использовать --forks – увеличить количество параллельных задач:
-```yaml
-      - name: Run Kubespray playbook
-        run: |
-          MASTER_IP=$(terraform output -raw master_ip)
-          cd kubespray
-          source venv/bin/activate
-          ansible-playbook -i ../inventory.ini cluster.yml -b --user ubuntu \
-          --forks=20 \
-          --extra-vars "apiserver_cert_extra_sans=['$MASTER_IP']"
+
+После отработки CICD будет поднят Kubernetes кластер
+В целях безопасности захожу на master копирую пароль grafana и .kube/config для test-app
+![img.png](imgs/img_21.png)
+
+![img.png](imgs/img_22.png)
+
+Переходим в репозиторий приложения
+![img.png](imgs/img_23.png)
+
+![img.png](imgs/img_24.png)
+
+![img_1.png](imgs/img_25.png)
+
+![img.png](imgs/img_26.png)
+
+Теперь чтобы приложение было доступно на 80 порту, нужно создать LoadBalancer в развертывании инфры
+Grafana собирается так (nodePort 31000):
 ```
+      - name: Deploy kube-prometheus-stack
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+          helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+            --namespace monitoring \
+            --create-namespace \
+            --set grafana.service.type=NodePort \
+            --set grafana.service.nodePort=31000
+```
+Нацелим балансировщик на порт 31000
+А у приложения на 32000
+![img.png](imgs/img_27.png)
 
+LB подняты для APP и Grafana:
+![img_3.png](imgs/img_30.png)
 
+### Приложение
+![img_4.png](imgs/img_31.png)
+
+### Grafana
+![img_5.png](imgs/img_32.png)
 
 ---
 ### Установка и настройка CI/CD
@@ -307,6 +337,11 @@ Github Actions при коммите в main и при создании tag v1.0
 ![img_19.png](imgs/img_19.png)
 ### С тегом 1.0.1:
 ![img_20.png](imgs/img_20.png)
+---
+# Ссылки
+Инфра - https://github.com/Werest/devops-diplom-yandexcloud-infra
+
+Приложение - https://github.com/Werest/test-app
 ---
 ## Что необходимо для сдачи задания?
 
