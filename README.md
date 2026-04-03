@@ -351,6 +351,9 @@ LB подняты для APP и Grafana:
 Инфра - https://github.com/Werest/devops-diplom-yandexcloud-infra
 
 Приложение - https://github.com/Werest/test-app
+
+bootstrap - Cоздание сервисного аккаунта и бакета https://github.com/Werest/devops-diplom-yandexcloud/bootstrap
+
 ---
 ## Что необходимо для сдачи задания?
 
