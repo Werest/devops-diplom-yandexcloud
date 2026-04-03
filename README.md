@@ -254,7 +254,7 @@ kubectl get secret -n monitoring monitoring-grafana -o jsonpath="{.data.admin-pa
 4. Http доступ на 80 порту к тестовому приложению.
 5. Atlantis или terraform cloud или ci/cd-terraform
 ---
-```
+
 После создания сервисного аккаунта повторно может возникнуть ошибка
 Service account 'aje27102e538kndc7k9h' already exists
 Поэтому однажды создаем сервисный аккаунт
