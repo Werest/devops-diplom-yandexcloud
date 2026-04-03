@@ -190,6 +190,7 @@ export AWS_SECRET_ACCESS_KEY=$(terraform output -raw secret_key)
 Забираю config - scp ubuntu@<master_ip>:.kube/config ~/.kube/config
 
 ![img_4.png](imgs/img_4.png)
+
 Бывает ещё так, что
 ```
 kubectl get nodes
@@ -253,6 +254,7 @@ kubectl get secret -n monitoring monitoring-grafana -o jsonpath="{.data.admin-pa
 4. Http доступ на 80 порту к тестовому приложению.
 5. Atlantis или terraform cloud или ci/cd-terraform
 ---
+```
 После создания сервисного аккаунта повторно может возникнуть ошибка
 Service account 'aje27102e538kndc7k9h' already exists
 Поэтому однажды создаем сервисный аккаунт
@@ -331,9 +333,9 @@ LB подняты для APP и Grafana:
 
 [Установка и настройка CI/CD для приложения через Github Actions](https://github.com/Werest/test-app/actions/workflows/docker-image.yml)
 
-Docker hub
+### Docker hub
 ![img_15.png](imgs/img_15.png)
-Github Actions при коммите в main и при создании tag v1.0.0
+### Github Actions при коммите в main и при создании tag v1.0.0
 ![img_16.png](imgs/img_16.png)
 
 ![img_17.png](imgs/img_17.png)
