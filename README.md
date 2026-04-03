@@ -302,6 +302,13 @@ LB подняты для APP и Grafana:
 ### Grafana
 ![img_5.png](imgs/img_32.png)
 
+Удалить ресурсы можно через ручной запуск workflow:
+
+![img.png](imgs/img_33.png)
+
+![img.png](imgs/img_34.png)
+
+![img_1.png](imgs/img_35.png)
 ---
 ### Установка и настройка CI/CD
 
