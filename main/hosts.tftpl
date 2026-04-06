@@ -1,0 +1,25 @@
+[all]
+master ansible_host=${master.network_interface[0].nat_ip_address} ansible_user=ubuntu
+%{ for idx, worker in workers ~}
+worker${idx + 1} ansible_host=${worker.network_interface[0].nat_ip_address} ansible_user=ubuntu
+%{ endfor }
+
+[kube_control_plane]
+master
+
+[kube_node]
+%{ for idx, worker in workers ~}
+worker${idx + 1}
+%{ endfor }
+
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3
+
+[etcd]
+master
+
+[calico_rr]
+
+[k8s_cluster:children]
+kube_control_plane
+kube_node
